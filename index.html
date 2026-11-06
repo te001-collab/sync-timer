@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>Sync Timer — 遠隔同期ストップウォッチ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -214,11 +215,14 @@
 <script>
 // ===== Firebase の設定（Firebase コンソールからコピーした値に置き換える）=====
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyASk9yvxWKclKBbAldnpX7CfkmnvGZS1Uc",
+  authDomain: "sync-timer-3e672.firebaseapp.com",
+  // Realtime Database の画面上部に出ている URL と同じか確認（違えば置き換える）
+  databaseURL: "https://sync-timer-3e672-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sync-timer-3e672",
+  storageBucket: "sync-timer-3e672.firebasestorage.app",
+  messagingSenderId: "133858274047",
+  appId: "1:133858274047:web:c07ba94647145328593aca",
 };
 </script>
 <script>
