@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sync Timer — 遠隔同期ストップウォッチ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#15171b; --line:#262a31; --text:#e9ecf1; --mute:#8a919c;
+    --amber:#ffb020; --green:#3ddc84; --red:#ff5c5c; --blue:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Noto Sans JP",system-ui,sans-serif}
+  body{display:flex;flex-direction:column;min-height:100%}
+  header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;
+    padding:10px 16px;border-bottom:1px solid var(--line)}
+  .brand,.status span,.chip{white-space:nowrap}
+  .status{flex-wrap:wrap;justify-content:flex-end}
+  @media (max-width:560px){ .brand small,.fsbtn{display:none} .status{gap:8px;font-size:12px} }
+  .brand{font-weight:700;letter-spacing:.04em}
+  .brand small{color:var(--mute);font-weight:400;margin-left:8px}
+  .status{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--mute)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mute);margin-right:6px;vertical-align:1px}
+  .dot.ok{background:var(--green)} .dot.warn{background:var(--amber)} .dot.bad{background:var(--red)}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;gap:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;width:100%;max-width:440px}
+  .card h2{margin:0 0 6px;font-size:18px}
+  .card p{margin:0 0 16px;color:var(--mute);font-size:14px;line-height:1.6}
+  .row{display:flex;gap:8px}
+  input{flex:1;background:#0f1114;border:1px solid var(--line);color:var(--text);border-radius:10px;
+    padding:12px 14px;font:600 18px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:lowercase}
+  input:focus{outline:2px solid var(--blue);outline-offset:1px}
+  button{cursor:pointer;border:1px solid var(--line);background:#1d2026;color:var(--text);
+    border-radius:10px;padding:12px 18px;font:700 15px "Noto Sans JP",sans-serif}
+  button:hover{filter:brightness(1.15)}
+  button:disabled{opacity:.4;cursor:default;filter:none}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#06101c}
+  .divider{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:12px;margin:18px 0}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .hidden{display:none !important}
+
+  #timerView{width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}
+  .role{font-size:12px;letter-spacing:.2em;color:var(--mute)}
+  .role b{color:var(--amber)}
+  .clock{font-family:"JetBrains Mono",monospace;font-weight:700;line-height:1;
+    font-size:clamp(56px,16vw,220px);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+    color:var(--text);transition:color .2s}
+  .clock .frac{font-size:.55em;color:var(--mute)}
+  .clock.running{color:var(--green)}
+  .clock.paused{color:var(--amber)}
+  .state{font:700 14px "JetBrains Mono",monospace;letter-spacing:.25em;color:var(--mute)}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .controls button{min-width:130px;padding:16px 22px;font-size:17px}
+  #btnStart{background:var(--green);border-color:var(--green);color:#04130a}
+  #btnStart.pause{background:var(--amber);border-color:var(--amber);color:#1a1000}
+  #btnReset{background:transparent}
+  .share{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:14px}
+  .code{font:700 22px "JetBrains Mono",monospace;letter-spacing:.18em;color:var(--amber)}
+  .share button{padding:8px 12px;font-size:13px}
+  .note{color:var(--mute);font-size:12px;text-align:center;max-width:560px;line-height:1.6}
+  .banner{background:#2a1d08;border:1px solid #5a3d0a;color:#ffd58a;border-radius:10px;padding:10px 14px;font-size:13px;max-width:560px;text-align:center}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1d2026;border:1px solid var(--line);
+    padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .startset{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;font-size:14px;color:var(--mute)}
+  .startset input{flex:none;width:140px;font-size:16px;padding:8px 12px;letter-spacing:.05em;text-align:center}
+  .startset button{padding:8px 14px;font-size:13px}
+  .startset .hint{font-size:12px;width:100%;text-align:center}
+  .startset.disabled{opacity:.4;pointer-events:none}
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .roles button{padding:18px 10px;font-size:18px}
+  .roles button:last-child{grid-column:span 2}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#1d2026;border:1px solid var(--line);
+    border-radius:999px;padding:4px 10px;font-size:12px;color:var(--text);cursor:pointer}
+  .chip b{color:var(--amber);font-family:"JetBrains Mono",monospace;letter-spacing:.12em}
+  .groupbar{display:flex;gap:6px;align-items:center}
+  .cues{width:100%;max-width:820px;display:flex;flex-direction:column;gap:6px}
+  .cuehead{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.2em;color:var(--mute)}
+  .cuehead b{color:var(--text);letter-spacing:.05em;font-size:13px}
+  #cueList{display:flex;flex-direction:column;gap:4px;overflow:hidden}
+  #cueList.slide{animation:slideUp .45s cubic-bezier(.2,.8,.2,1)}
+  @keyframes slideUp{from{transform:translateY(34px);opacity:.2}to{transform:none;opacity:1}}
+  .cue{display:flex;align-items:center;gap:10px;min-width:0;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px}
+  .cue .tag{flex:none;width:58px;font:700 10px "JetBrains Mono",monospace;letter-spacing:.12em;color:var(--mute)}
+  .cue .t{flex:none;font:600 12px "JetBrains Mono",monospace;color:var(--mute)}
+  .cue .txt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cue .txt small{color:var(--mute);font-size:11px;margin-left:8px}
+  .cue.now,.cue.later{opacity:.55}
+  .cue.now small,.cue.later small{display:none}
+  .cue.next{border-color:var(--blue);background:#101a26;padding:8px 12px;border-radius:10px}
+  .cue.next .tag{color:var(--blue)}
+  .cue.next .t{color:var(--text)}
+  .cue.next .txt{font-size:clamp(15px,3vw,20px);font-weight:700;white-space:normal}
+  .cue.next .txt small{display:block;margin:1px 0 0;font-weight:400}
+  .cd{flex:none;font:700 clamp(22px,4.5vw,32px) "JetBrains Mono",monospace;color:var(--blue);white-space:nowrap}
+  .cd small{font-size:.42em;color:var(--mute);margin-left:3px}
+  .cue.next.soon{border-color:var(--amber);background:#241a07}
+  .cue.next.soon .cd,.cue.next.soon .tag{color:var(--amber)}
+  .cue.next.go{animation:flash .5s steps(2) infinite}
+  @keyframes flash{50%{background:#3a2a05}}
+  .cue.empty{justify-content:center;color:var(--mute)}
+  @media (max-width:560px){ .cue .tag{width:46px} .cue .t{display:none} .cue.next .t{display:inline} }
+  .roles button.wide{grid-column:span 2}
+  .roles.shows button:last-child{grid-column:auto}
+  .scenebar{display:flex;align-items:stretch;gap:6px}
+  .scenebar button{flex:none;padding:6px 12px;font-size:16px;border-radius:8px}
+  .scene{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .scene .no{font:700 10px "JetBrains Mono",monospace;letter-spacing:.15em;color:var(--mute)}
+  .scene b{font-size:15px}
+  .scene small{color:var(--amber);font-size:12px}
+  .scene .nx{color:var(--mute);font-size:11px;margin-left:auto}
+  .banner button{margin-left:8px;padding:4px 10px;font-size:12px}
+  .chip.on{border-color:var(--green);color:var(--green)}
+  #nsVideo{position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;left:0}
+  .card{position:relative}
+  .backBtn{position:absolute;top:16px;right:16px;padding:6px 12px;font-size:13px;background:transparent}
+  .fsbtn{background:transparent;padding:6px 10px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SYNC TIMER<small>遠隔同期ストップウォッチ</small></div>
+  <div class="status">
+    <span id="connStatus"><span class="dot" id="connDot"></span><span id="connText">接続中…</span></span>
+    <span id="peerCount" class="hidden"></span>
+    <span class="groupbar hidden" id="groupBar">
+      <span class="chip" id="btnCopyCode" title="コードをコピー">GROUP <b id="codeLabel">------</b></span>
+      <span class="chip" id="btnCopyLink">🔗 リンク</span>
+      <span class="chip" id="btnLeave">退出</span>
+    </span>
+    <span class="chip hidden" id="roleChip" title="役職・演目を変更"><b id="roleName"></b></span>
+    <span class="chip" id="btnWake" title="画面スリープ防止">☾ スリープ防止 OFF</span>
+    <button class="fsbtn" id="btnFs" title="全画面">⛶ 全画面</button>
+  </div>
+</header>
+
+<main>
+  <!-- 役職選択 -->
+  <section id="roleView" class="card">
+    <h2>あなたの役職は？</h2>
+    <button class="backBtn hidden" type="button">← 戻る</button>
+    <p>選んだ役職の照明指示が表示されます。</p>
+    <div class="roles" id="roleButtons"></div>
+  </section>
+
+  <!-- 演目選択 -->
+  <section id="showView" class="card hidden">
+    <h2>演目を選んでください</h2>
+    <button class="backBtn hidden" type="button">← 戻る</button>
+    <p>選んだ演目の照明指示が表示されます。</p>
+    <div class="roles shows" id="showButtons"></div>
+  </section>
+
+  <!-- 参加画面 -->
+  <section id="lobbyView" class="card hidden">
+    <h2>グループに参加</h2>
+    <p>操作者から共有されたグループコードを入力してください。</p>
+    <form id="joinForm" class="row">
+      <input id="codeInput" maxlength="12" placeholder="例: k7m2qx" autocomplete="off" spellcheck="false">
+      <button class="primary" type="submit">参加</button>
+    </form>
+    <div id="createBlock">
+      <div class="divider">または</div>
+      <p>新しいグループを作って、あなたがストップウォッチを操作します。</p>
+      <button class="primary" id="btnCreate" style="width:100%">新しいグループを作成</button>
+    </div>
+  </section>
+
+  <!-- タイマー画面 -->
+  <section id="timerView" class="hidden">
+    <div class="role" id="roleLabel"></div>
+    <div class="clock" id="clock">00:00:00<span class="frac">.0</span></div>
+    <div class="state" id="stateLabel">STOP</div>
+
+    <div class="controls hidden" id="controls">
+      <button id="btnStart">▶ スタート</button>
+      <button id="btnReset">↺ リセット</button>
+    </div>
+    <form class="startset hidden" id="startForm">
+      <label for="startInput">開始時間</label>
+      <input id="startInput" placeholder="0:00" autocomplete="off" spellcheck="false" inputmode="numeric">
+      <button type="submit">セット</button>
+      <span class="hint">例: 90 / 1:30 / 1:02:30</span>
+    </form>
+
+    <div class="banner hidden" id="waitBanner">操作者がまだスタートしていません（このグループの情報を待っています）</div>
+
+    <div class="banner hidden" id="showBanner"></div>
+    <div class="cues" id="cues">
+      <div class="scenebar hidden" id="sceneBar">
+        <button id="btnPrevScene" class="opOnly" title="前のシーン">◀</button>
+        <div class="scene"><span class="no" id="sceneNo"></span><b id="sceneName"></b><small id="sceneKik"></small><span class="nx" id="sceneNext"></span></div>
+        <button id="btnNextScene" class="opOnly" title="次のシーン">▶</button>
+      </div>
+      <div class="cuehead" id="cueHead"><span>CUE SHEET</span><b id="cueRole"></b></div>
+      <div id="cueList"></div>
+    </div>
+    <div class="note" id="noteOp"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+<video id="nsVideo" playsinline muted loop preload="auto" src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMpbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAlN0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHLbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABdm1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAATZzdGJsAAAAtnN0c2QAAAAAAAAAAQAAAKZhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAALGF2Y0MBQsAK/+EAFWdCwAraewEQAAADABAAAAMAIPEiagEABGjOD8gAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAAKMAAACjAAAAAYc3R0cwAAAAAAAAABAAAAAgAAQAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjAAAAAAAAAAEAAAABAAAAAgAAAAEAAAAcc3RzegAAAAAAAAAAAAAAAgAAAoMAAAAJAAAAFHN0Y28AAAAAAAAAAQAAA1kAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjYwLjE2LjEwMAAAAAhmcmVlAAAClG1kYXQAAAJtBgX//2ncRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MCByZWY9MSBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgxOjB4MSBtZT1oZXggc3VibWU9MiBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0wIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MCA4eDhkY3Q9MCBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0wIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTAgd2VpZ2h0cD0wIGtleWludD0yNTAga2V5aW50X21pbj0xIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9MTAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAADmWIhAW///8PRQABT3+AAAAABUGaIBX1"></video>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ===== Firebase の設定（Firebase コンソールからコピーした値に置き換える）=====
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  appId: "",
+};
+</script>
+<script>
+(() => {
+
+  const $ = id => document.getElementById(id);
+
+  // ===== 照明指示（キューシート）=====
+  // 演目 → シーン（曲・MC）→ 行。t はシーン開始からの時間（省略＝シーン開始時）
+  // 列: sound=音響備考 / par=Par / titan=タイタン / led=LED / pin=ピン / light=照明備考
+  const ROLES = ["ピン", "音響", "照明", "タイタン", "LED", "その他"];
+  const ROLE_FIELDS = { "ピン":["pin"], "音響":["sound"], "照明":["par","light"], "タイタン":["titan"], "LED":["led"] };
+  const MC = (pin="MC（小）", extra={}) => [{ sound:"マイク", par:"フロアLv.2", pin, ...extra }];
+  const SHOWS = {
+    "デンマーク体操部": [],
+    "レオニズ": [],
+    "ジュリアス": [],
+    "Nova": [],
+    "エアロビ": [
+      { name:"客入れ（30分）", rows:[{ sound:"BGMあり", light:"プロジェクター／開演15分前暗転" }] },
+      { name:"MC（3分）", rows: MC() },
+      { name:"OP：ジャンボリ", kik:"MC合図（音先）", rows:[
+        { t:"0:00", par:"全箇所Lv.3", titan:"放射線*（青・緑）", led:"黄色" },
+        { t:"0:34", titan:"ぐるぐる*（黄・緑）" },
+        { t:"1:43", par:"全箇所Lv.1", titan:"暗転", led:"暗転" },
+      ]},
+      { name:"MC（3分）", rows: MC() },
+      { name:"2曲目：中高生", kik:"MC合図（音先）", rows:[
+        { t:"0:00", par:"全箇所Lv.3", titan:"ぐるぐる（青）", led:"薄ピンク" },
+        { t:"0:06", titan:"ぐるぐる（ピンク・水色）" },
+        { t:"0:20", titan:"ぐるぐる（ピンク・緑）" },
+        { t:"0:42", led:"紫 点滅" },
+        { t:"0:50", titan:"放射線（ピンク・緑）" },
+        { t:"1:03", par:"目潰し", titan:"放射線（紫・水色）", led:"水色 点滅" },
+        { t:"1:17", sound:"2曲目に続く", par:"全箇所Lv.1", titan:"消灯", led:"消灯" },
+        { t:"1:21", par:"全箇所Lv.3", titan:"ミラぐる（紫・シアン）" },
+        { t:"1:28", led:"黄色 点滅" },
+        { t:"1:31", titan:"ミラぐる（黄・オレンジ）" },
+        { t:"1:44", titan:"ミラぐる（オレンジ・ピンク・赤）" },
+        { t:"1:57", titan:"ミラクロ（赤）" },
+        { t:"2:09", titan:"ミラ放（オレンジ・ピンク・赤）", led:"薄ピンク 点滅" },
+        { t:"2:15", par:"目潰し" },
+        { t:"2:47", titan:"ミラ放（ピンク・黄色）" },
+        { t:"3:40", par:"全箇所Lv.1", titan:"消灯", led:"消灯" },
+      ]},
+      { name:"MC（2分）", rows: MC() },
+      { name:"3曲目：フィットネス班", kik:"MC合図（音先）", rows:[
+        { t:"0:00", par:"全箇所Lv.1", pin:"手書きメモあり（要確認）" },
+        { t:"0:02", par:"全箇所Lv.3", titan:"放射線*（薄ピンク・紫）", led:"赤" },
+        { t:"0:27", titan:"ぐるぐる*（黄・黄緑）", led:"緑" },
+        { t:"0:44", titan:"クロス（水色）", led:"青" },
+        { t:"1:12", titan:"真上（オレンジ）", led:"黄色" },
+        { t:"1:25", titan:"クロス（緑）", led:"オレンジ" },
+        { t:"1:41", titan:"ぐるぐる（黄緑）", led:"薄ピンク", pin:"中央4人（中）" },
+        { t:"1:45", titan:"ぐるぐる（オレンジ）", pin:"下手側3人（中）" },
+        { t:"1:49", titan:"ぐるぐる（水色）", led:"水色", pin:"上手側2人（中）" },
+        { t:"1:53", titan:"クロス（青）" },
+        { t:"2:15", titan:"真上（薄ピンク）", led:"紫" },
+      ]},
+      { name:"MC（2分）", rows: MC("フロア（大）") },
+      { name:"4曲目：競技班", kik:"手を上げた2秒後に再生", rows:[
+        { t:"0:00", sound:"手を上げた2秒後に再生", par:"全箇所Lv.3", titan:"真上（白）" },
+        { t:"0:16", titan:"放射線*（白・青）" },
+        { t:"0:28", titan:"ぐるぐる（白）" },
+        { t:"0:40", titan:"クロス（黄緑）" },
+        { t:"1:13", titan:"放射線*（黄・赤）" },
+      ]},
+      { name:"MC（2分）", rows: MC("MC（小）", { light:"プロジェクター" }) },
+      { name:"技紹介（10分）", rows:[{ sound:"マイク", light:"明点" }] },
+      { name:"MC（2分）", rows: MC() },
+      { name:"ED：ZOO", kik:"MC合図（音先）", rows:[
+        { t:"0:00", par:"全箇所Lv.4", titan:"クロス（紫）" },
+        { t:"0:48", titan:"真上（水色）" },
+      ]},
+      { name:"終演挨拶（1分）", rows:[{ sound:"マイク" }] },
+      { name:"写真撮影等（10分）", rows:[] },
+      { name:"客出し（10分）", rows:[] },
+    ],
+  };
+  const toMs = t => { const p = String(t||"0:00").split(":").map(Number); let s=0; for (const x of p) s = s*60 + x; return s*1000; };
+  const LABEL = { par:"Par", light:"備考" };
+  function sceneCues(show, idx, role){
+    const sc = (SHOWS[show]||[])[idx]; const f = ROLE_FIELDS[role];
+    if (!sc || !f) return [];
+    const out = [];
+    sc.rows.forEach(r => {
+      const parts = f.filter(k => r[k]).map(k => f.length > 1 ? `${LABEL[k]}: ${r[k]}` : r[k]);
+      if (parts.length) out.push({ t: r.t || "開始", ms: toMs(r.t), text: parts.join(" ／ "), no: "" });
+    });
+    out.sort((a,b) => a.ms - b.ms);
+    out.forEach((c,i) => c.no = "#" + (i+1));
+    return out;
+  }
+
+  const S = {
+    group: null, canEdit: false, skew: 0, vAt: 0, isOperator: false,
+    // 操作者の正となる状態
+    running: false, startAt: 0, accum: 0, epoch: 0,
+    // 視聴者の推定
+    vRunning: false, vEpoch: -1, vBase: 0, haveState: false,
+    peers: 0, connected: false, unsub: [], role: null, show: null, scene: 0, vShow: null, vScene: 0,
+  };
+
+  // ---------- 表示 ----------
+  const pad = (n, w=2) => String(n).padStart(w, "0");
+  function fmt(ms){
+    ms = Math.max(0, ms);
+    const t = Math.floor(ms/100) % 10;
+    const s = Math.floor(ms/1000);
+    return `${pad(Math.floor(s/3600))}:${pad(Math.floor(s/60)%60)}:${pad(s%60)}<span class="frac">.${t}</span>`;
+  }
+  function opElapsed(){ return S.accum + (S.running ? performance.now() - S.startAt : 0); }
+  const serverNow = () => Date.now() + (S.skew || 0);
+  function viewerElapsed(){
+    if (!S.haveState) return 0;
+    if (!S.vRunning) return S.vBase;
+    return S.vBase + Math.max(0, serverNow() - S.vAt);
+  }
+  let lastHtml = "";
+  function frame(){
+    let ms, running;
+    if (S.isOperator){ ms = opElapsed(); running = S.running; }
+    else { ms = viewerElapsed(); running = S.vRunning && S.haveState; }
+    const html = fmt(ms);
+    if (html !== lastHtml){ $("clock").innerHTML = html; lastHtml = html; }
+    const clock = $("clock");
+    clock.classList.toggle("running", running);
+    clock.classList.toggle("paused", !running && ms > 0);
+    $("stateLabel").textContent = running ? "RUNNING" : (ms > 0 ? "PAUSED" : "STOP");
+    renderCues(ms);
+    if (!S.isOperator && S.code){
+      const stale = !S.haveState;
+      $("waitBanner").classList.toggle("hidden", !stale);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  function cueRow(c, kind, cls, extra=""){
+    return `<div class="cue ${kind} ${cls}"><span class="tag">${kind==="now"?"NOW":kind==="next"?"NEXT":"THEN"} ${esc(c.no||"")}</span>`+
+      `<span class="t">${esc(c.t)}</span><span class="txt">${esc(c.text)}${c.note?`<small>${esc(c.note)}</small>`:""}</span>${extra}</div>`;
+  }
+  let lastCueKey = "";
+  function renderCues(ms){
+    if (!S.role) return;
+    const scene = curScene();
+    renderScene(scene);
+    if (S.role === "その他") return;
+    const list = sceneCues(S.show, scene, S.role);
+    let i = ms > 0 ? list.findIndex(c => c.ms > ms) : 0;   // 次のキュー（0:00ちょうどは「次」扱い）
+    if (i < 0) i = list.length;
+    const now = list[i-1], next = list[i], then = list[i+1];
+    let remain = next ? (next.ms - ms) : 0;
+    const rTxt = next ? (remain/1000).toFixed(1) : "";
+    const soon = next && remain <= 5000;
+    const key = `${S.role}|${S.show}|${scene}|${i}|${rTxt}`;
+    if (key === lastCueKey) return;
+    const pk = lastCueKey.split("|"), changed = pk[0] === S.role && pk[1] === String(S.show) && (pk[2] !== String(scene) || pk[3] !== String(i));
+    lastCueKey = key;
+    if (changed){ const el = $("cueList"); el.classList.remove("slide"); void el.offsetWidth; el.classList.add("slide"); }
+    let html = "";
+    const scenes = SHOWS[S.show] || [];
+    if (!scenes.length) html = `<div class="cue empty">この演目の照明指示はまだ登録されていません</div>`;
+    else if (!list.length) html = `<div class="cue empty">このシーンでの指示はありません</div>`;
+    else {
+      if (now) html += cueRow(now, "now", "");
+      if (next) {
+        const cls = (soon ? "soon" : "") + (remain <= 1000 ? " go" : "");
+        html += cueRow(next, "next", cls, `<span class="cd">${rTxt}<small>秒後</small></span>`);
+      } else {
+        const nx = scenes[scene+1];
+        html += `<div class="cue empty">このシーンの指示は終了${nx ? " → 次: " + esc(nx.name) : ""}</div>`;
+      }
+      if (then) html += cueRow(then, "later", "");
+    }
+    $("cueList").innerHTML = html;
+  }
+
+  function curScene(){
+    if (S.isOperator) return S.scene;
+    return (S.haveState && S.vShow === S.show) ? S.vScene : 0;
+  }
+  let lastSceneKey = "";
+  function renderScene(scene){
+    const scenes = SHOWS[S.show] || [];
+    const other = S.role === "その他";
+    $("sceneBar").classList.toggle("hidden", !scenes.length || (other && !S.isOperator));
+    $("cueHead").classList.toggle("hidden", other);
+    $("cueList").classList.toggle("hidden", other);
+    $("cues").classList.toggle("hidden", other && !S.isOperator);
+    document.querySelectorAll(".opOnly").forEach(b => b.classList.toggle("hidden", !S.isOperator));
+    // 演目ズレの警告（視聴者）
+    const mis = !S.isOperator && S.haveState && S.vShow && S.show && S.vShow !== S.show && !other;
+    const bn = $("showBanner");
+    if (mis && bn.dataset.show !== S.vShow){
+      bn.dataset.show = S.vShow;
+      bn.innerHTML = `操作者は「${esc(S.vShow)}」を進行中です<button id="btnMatch">合わせる</button>`;
+      $("btnMatch").onclick = () => setShow(S.vShow);
+    }
+    bn.classList.toggle("hidden", !mis);
+    const key = `${S.show}|${scene}`;
+    if (key === lastSceneKey || !scenes.length) return;
+    lastSceneKey = key;
+    const sc = scenes[scene] || {}, nx = scenes[scene+1];
+    $("sceneNo").textContent = `SCENE ${scene+1}/${scenes.length}`;
+    $("sceneName").textContent = sc.name || "";
+    $("sceneKik").textContent = sc.kik ? "きっかけ: " + sc.kik : "";
+    $("sceneNext").textContent = nx ? "次: " + nx.name : "最後のシーン";
+    $("btnPrevScene").disabled = scene <= 0;
+    $("btnNextScene").disabled = scene >= scenes.length - 1;
+  }
+  function goScene(d){
+    const n = (SHOWS[S.show]||[]).length;
+    const ns = Math.min(Math.max(S.scene + d, 0), n - 1);
+    if (ns === S.scene) return;
+    S.scene = ns; S.running = false; S.accum = 0; S.startOffset = 0;
+    $("startInput").value = "0:00";
+    bump();
+  }
+  $("btnPrevScene").onclick = () => goScene(-1);
+  $("btnNextScene").onclick = () => goScene(1);
+
+  function updateChip(){
+    $("roleName").textContent = S.role + (S.show && S.role !== "その他" ? " ／ " + S.show : "");
+    $("cueRole").textContent = S.role;
+    $("roleChip").classList.remove("hidden");
+  }
+  function setRole(r){
+    S.role = r; lastCueKey = ""; lastSceneKey = "";
+    try { localStorage.setItem("synctimer:role", r); } catch(e){}
+  }
+  function setShow(sh){
+    if (S.isOperator && sh !== S.show){ S.scene = 0; S.running = false; S.accum = 0; S.startOffset = 0; }
+    S.show = sh; lastCueKey = ""; lastSceneKey = "";
+    try { localStorage.setItem("synctimer:show", sh); } catch(e){}
+    updateChip();
+    if (S.isOperator) bump();
+  }
+  function showRolePicker(){
+    document.querySelectorAll(".backBtn").forEach(b => b.classList.toggle("hidden", !S.role));
+    $("roleView").classList.remove("hidden");
+    ["showView","lobbyView","timerView"].forEach(id => $(id).classList.add("hidden"));
+  }
+  function afterPicks(){
+    ["roleView","showView"].forEach(id => $(id).classList.add("hidden"));
+    updateChip();
+    if (S.code) { $("timerView").classList.remove("hidden"); return; }
+    const c = hashCode();
+    if (c) whenBooted(() => startFromHash(c)); else $("lobbyView").classList.remove("hidden");
+  }
+  $("roleButtons").innerHTML = ROLES.map(r => `<button data-role="${r}"${r==="その他"?' class="wide"':""}>${r}</button>`).join("");
+  $("showButtons").innerHTML = Object.keys(SHOWS).map(r => `<button data-show="${r}">${r}</button>`).join("");
+  $("roleButtons").addEventListener("click", e => {
+    const r = e.target.closest("button")?.dataset.role; if (!r) return;
+    setRole(r);
+    if (r === "その他" && !S.canEdit){ afterPicks(); return; }
+    $("roleView").classList.add("hidden");
+    $("showView").classList.remove("hidden");
+  });
+  $("showButtons").addEventListener("click", e => {
+    const sh = e.target.closest("button")?.dataset.show; if (!sh) return;
+    setShow(sh); afterPicks();
+  });
+  function pickerOpen(){ return !$("roleView").classList.contains("hidden") || !$("showView").classList.contains("hidden"); }
+  function backToTimer(){
+    ["roleView","showView"].forEach(id => $(id).classList.add("hidden"));
+    if (S.code) $("timerView").classList.remove("hidden"); else $("lobbyView").classList.remove("hidden");
+  }
+  // もう一度押すと選び直しをやめて元の画面に戻る
+  $("roleChip").onclick = () => {
+    if (pickerOpen() && S.role) backToTimer(); else showRolePicker();
+  };
+  document.querySelectorAll(".backBtn").forEach(b => b.onclick = backToTimer);
+
+  function toast(msg){
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+  function setConn(kind, text){
+    $("connDot").className = "dot " + kind; $("connText").textContent = text;
+  }
+  function renderPeers(){
+    const el = $("peerCount");
+    if (!S.code || !S.connected){ el.classList.add("hidden"); return; }
+    el.classList.remove("hidden");
+    el.textContent = `参加中 ${S.peers}人`;
+  }
+
+  // ---------- 操作者 ----------
+  // ---------- Firebase ----------
+  const FB = { db:null, auth:null, uid:null, refs:[] };
+  function fbReady(){ return !!(FB.db && FB.uid); }
+  function stateRef(code){ return FB.db.ref(`groups/${code}/state`); }
+  function broadcast(){
+    if (!S.isOperator || !S.code || !fbReady()) return;
+    stateRef(S.code).set({
+      running: S.running, elapsed: Math.round(opElapsed()),
+      at: firebase.database.ServerValue.TIMESTAMP,
+      epoch: S.epoch, show: S.show || "", scene: S.scene, startOffset: S.startOffset || 0,
+    }).catch(err => toast("送信できませんでした: " + (err && err.code || err)));
+  }
+  function bump(){ S.epoch++; broadcast(); renderButtons(); }
+  function parseTime(v){
+    v = (v||"").trim().replace(/：/g, ":");
+    if (!v) return 0;
+    if (!/^\d+(:\d{1,2}){0,2}(\.\d)?$/.test(v)) return null;
+    let [main, frac] = v.split(".");
+    const parts = main.split(":").map(Number);
+    let s = 0; for (const p of parts) s = s*60 + p;
+    return s*1000 + (frac ? Number(frac)*100 : 0);
+  }
+  function fmtPlain(ms){
+    const s = Math.floor(ms/1000), h = Math.floor(s/3600), m = Math.floor(s/60)%60, sec = s%60;
+    return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  }
+  $("startForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const ms = parseTime($("startInput").value);
+    if (ms === null){ toast("形式が正しくありません（例: 1:30）"); return; }
+    S.startOffset = ms;
+    $("startInput").value = fmtPlain(ms);
+    if (!S.running){ S.accum = ms; }
+    toast(`開始時間を ${fmtPlain(ms)} にセットしました`);
+    bump();
+  });
+  function renderButtons(){
+    $("startForm").classList.toggle("disabled", S.running);
+    const b = $("btnStart");
+    b.textContent = S.running ? "❚❚ 一時停止" : (opElapsed() > (S.startOffset||0) ? "▶ 再開" : "▶ スタート");
+    b.classList.toggle("pause", S.running);
+  }
+  $("btnStart").onclick = () => {
+    if (S.running){ S.accum = opElapsed(); S.running = false; }
+    else { S.startAt = performance.now(); S.running = true; }
+    bump();
+  };
+  $("btnReset").onclick = () => {
+    S.running = false; S.accum = S.startOffset || 0; bump();
+  };
+
+  // ---------- 視聴者 ----------
+  function onState(d){
+    if (!d || typeof d.elapsed !== "number"){ S.haveState = false; return; }
+    S.vEpoch = d.epoch; S.vRunning = !!d.running; S.vBase = d.elapsed;
+    S.vAt = typeof d.at === "number" ? d.at : serverNow();
+    S.haveState = true;
+    S.vShow = d.show || null;
+    S.vScene = Number.isInteger(d.scene) && d.scene >= 0 ? d.scene : 0;
+  }
+
+  // ---------- グループ ----------
+  function randCode(){
+    const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = "";
+    const r = crypto.getRandomValues(new Uint32Array(6));
+    for (const x of r) s += a[x % a.length];
+    return s;
+  }
+  function cleanCode(v){ return (v||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12); }
+
+  async function claimGroup(code){
+    // 空いていればこのグループの操作者になる
+    const r = await FB.db.ref(`groups/${code}/owner`).transaction(cur => cur === null ? FB.uid : undefined);
+    return r.committed;
+  }
+  async function enterGroup(code, create){
+    code = cleanCode(code);
+    if (!code){ toast("コードを入力してください"); return; }
+    await leaveGroup(true);
+    S.isOperator = false;
+    if (fbReady()){
+      try{
+        if (create){
+          let ok = await claimGroup(code), tries = 0;
+          while (!ok && tries++ < 5){ code = randCode(); ok = await claimGroup(code); }
+          if (!ok){ toast("グループを作れませんでした"); return; }
+        }
+        const owner = (await FB.db.ref(`groups/${code}/owner`).get()).val();
+        if (!create && owner === null){ toast("そのグループは見つかりません"); return; }
+        S.isOperator = owner === FB.uid;
+      }catch(e){ toast("接続エラー: " + (e && e.code || e)); return; }
+    } else {
+      S.isOperator = !!create;   // Firebase 未設定時はこの端末だけで動く
+    }
+    $("codeLabel").textContent = code;
+    S.code = code;
+    try { location.hash = "g-" + code; } catch(e){}
+    ["lobbyView","roleView","showView"].forEach(id => $(id).classList.add("hidden"));
+    $("timerView").classList.remove("hidden");
+    $("groupBar").classList.remove("hidden");
+    $("controls").classList.toggle("hidden", !S.isOperator);
+    $("startForm").classList.toggle("hidden", !S.isOperator);
+    $("roleLabel").innerHTML = S.isOperator ? "<b>操作者</b> · OPERATOR" : "視聴中 · VIEWER";
+    $("noteOp").textContent = S.isOperator
+      ? "操作内容はすぐに参加者全員へ届きます。ページを閉じても状態は保存されます。"
+      : "時間はサーバーの時計で合わせて表示しています。";
+    S.haveState = false;
+    if (S.isOperator){
+      S.running = false; S.accum = 0; S.epoch = 0; S.startOffset = 0; S.scene = 0;
+      // 前回の状態から再開
+      try{
+        const d = fbReady() ? (await stateRef(code).get()).val() : null;
+        if (d && typeof d.elapsed === "number"){
+          S.epoch = (d.epoch|0) + 1;
+          S.startOffset = d.startOffset || 0;
+          if (!S.show && d.show) S.show = d.show;
+          if (d.show === S.show && Number.isInteger(d.scene)) S.scene = d.scene;
+          S.running = !!d.running;
+          S.accum = d.running ? d.elapsed + Math.max(0, serverNow() - d.at) : d.elapsed;
+          S.startAt = performance.now();
+          updateChip();
+        }
+      }catch(e){}
+      renderButtons();
+      $("startInput").value = fmtPlain(S.startOffset);
+    }
+    if (!fbReady()){ setConn("bad", "Firebase 未設定（この端末のみ）"); return; }
+    // 状態を購読
+    const sref = stateRef(code);
+    const h = sref.on("value", snap => { if (!S.isOperator) onState(snap.val()); });
+    FB.refs.push(() => sref.off("value", h));
+    // 参加人数
+    const vref = FB.db.ref(`groups/${code}/viewers`);
+    const me = vref.child(FB.uid);
+    me.set(true).catch(()=>{}); me.onDisconnect().remove();
+    const vh = vref.on("value", snap => { S.peers = snap.numChildren(); renderPeers(); });
+    FB.refs.push(() => { vref.off("value", vh); me.onDisconnect().cancel(); me.remove().catch(()=>{}); });
+    renderPeers();
+    if (S.isOperator) broadcast();
+  }
+  async function leaveGroup(silent){
+    FB.refs.forEach(u => { try{u()}catch(e){} }); FB.refs = [];
+    S.isOperator = false; S.peers = 0; renderPeers();
+    $("groupBar").classList.add("hidden");
+    if (!silent){
+      S.code = null; S.scene = 0;
+      try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+      $("timerView").classList.add("hidden");
+      $("lobbyView").classList.remove("hidden");
+    }
+  }
+
+  $("joinForm").addEventListener("submit", e => {
+    e.preventDefault(); whenBooted(() => enterGroup($("codeInput").value, false));
+  });
+  $("btnCreate").onclick = () => whenBooted(() => enterGroup(randCode(), true));
+  $("btnLeave").onclick = () => leaveGroup(false);
+
+  async function copy(text){
+    try { await navigator.clipboard.writeText(text); toast("コピーしました"); }
+    catch(e){ toast(text); }
+  }
+  $("btnCopyCode").onclick = () => copy(S.code || "");
+  $("btnCopyLink").onclick = () => copy(location.origin + location.pathname + "#g-" + S.code);
+  $("btnFs").onclick = () => {
+    const d = document;
+    if (d.fullscreenElement) d.exitFullscreen().catch(()=>{});
+    else d.documentElement.requestFullscreen?.().catch(()=> toast("全画面はこの環境では使えません"));
+  };
+
+  // ---------- 画面スリープ防止 ----------
+  const W = { want:false, lock:null, mode:"" };
+  function renderWake(){
+    const on = W.want && (W.lock || W.mode === "video");
+    const el = $("btnWake");
+    el.textContent = on ? "☀ スリープ防止 ON" : "☾ スリープ防止 OFF";
+    el.classList.toggle("on", !!on);
+  }
+  async function acquireWake(){
+    if (!W.want) return;
+    // 1) Wake Lock API
+    try{
+      if ("wakeLock" in navigator && !W.lock){
+        W.lock = await navigator.wakeLock.request("screen");
+        W.mode = "api";
+        W.lock.addEventListener("release", () => { W.lock = null; renderWake(); });
+        renderWake(); return;
+      }
+      if (W.lock){ renderWake(); return; }
+    }catch(e){ W.lock = null; }
+    // 2) 無音動画をループ再生（Wake Lock が使えない環境向け）
+    try{
+      const v = $("nsVideo"); v.muted = true;
+      await v.play(); W.mode = "video";
+    }catch(e){ W.mode = ""; toast("この環境ではスリープ防止が使えません。端末の自動ロックをオフにしてください"); }
+    renderWake();
+  }
+  function releaseWake(){
+    W.want = false;
+    try{ W.lock && W.lock.release(); }catch(e){}
+    W.lock = null; W.mode = "";
+    try{ $("nsVideo").pause(); }catch(e){}
+    renderWake();
+  }
+  $("btnWake").onclick = () => { W.want ? releaseWake() : (W.want = true, acquireWake()); };
+  // 最初のタップで自動的にON（ブラウザはタップ操作がないと許可しないため）
+  document.addEventListener("pointerdown", function first(){
+    document.removeEventListener("pointerdown", first, true);
+    if (!W.want){ W.want = true; acquireWake(); }
+  }, true);
+  // タブに戻ってきたら取り直す
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && W.want) acquireWake();
+  });
+
+
+  // ---------- 起動 ----------
+  function hashCode(){
+    const h = (location.hash || "").replace(/^#/, "");
+    return h.startsWith("g-") ? cleanCode(h.slice(2)) : "";
+  }
+  async function boot(){
+    requestAnimationFrame(frame);
+    $("createBlock").classList.remove("hidden");
+    if (!FIREBASE_CONFIG.apiKey || !window.firebase){
+      setConn("bad", "Firebase 未設定");
+    } else {
+      try{
+        firebase.initializeApp(FIREBASE_CONFIG);
+        FB.db = firebase.database(); FB.auth = firebase.auth();
+        FB.db.ref(".info/serverTimeOffset").on("value", s => { S.skew = s.val() || 0; });
+        FB.db.ref(".info/connected").on("value", s => {
+          S.connected = !!s.val(); renderPeers();
+          S.connected ? setConn("ok", S.code ? "同期中" : "オンライン") : setConn("warn", "接続中…");
+        });
+        const cred = await FB.auth.signInAnonymously();
+        FB.uid = cred.user.uid;
+      }catch(e){
+        setConn("bad", "接続できません: " + (e && e.code || e));
+      }
+    }
+    S.booted = true;
+    // 前回の役職を選択済みとして強調
+    let prev = null; try { prev = localStorage.getItem("synctimer:role"); } catch(e){}
+    if (prev) document.querySelector(`#roleButtons [data-role="${prev}"]`)?.classList.add("primary");
+    let prevShow = null; try { prevShow = localStorage.getItem("synctimer:show"); } catch(e){}
+    if (prevShow) document.querySelector(`#showButtons [data-show="${prevShow}"]`)?.classList.add("primary");
+  }
+  function whenBooted(fn){ if (S.booted) fn(); else setTimeout(() => whenBooted(fn), 100); }
+  function startFromHash(code){ enterGroup(code, false); }   // 作成者本人なら自動で操作者になる
+  window.addEventListener("hashchange", () => {
+    const c = hashCode();
+    if (c && c !== S.code && S.role) whenBooted(() => enterGroup(c, false));
+  });
+  boot();
+})();
+</script>
+</body>
+</html>
