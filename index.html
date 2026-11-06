@@ -110,7 +110,7 @@
   .roles button.wide{grid-column:span 2}
   .roles.shows button:last-child{grid-column:auto}
   .scenebar{display:flex;align-items:stretch;gap:6px}
-  .scenebar button{flex:none;padding:6px 12px;font-size:16px;border-radius:8px}
+  .scenebar button{flex:1;padding:10px 12px;font-size:14px;border-radius:8px}
   .scene{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;
     display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
   .scene .no{font:700 10px "Inter","Noto Sans JP",sans-serif;letter-spacing:.15em;color:var(--mute)}
@@ -122,6 +122,15 @@
   #nsVideo{position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;left:0}
   .card{position:relative}
   .backBtn{position:absolute;top:16px;right:16px;padding:6px 12px;font-size:13px;background:transparent}
+  #timerView{gap:14px}
+  .prog{text-align:center;max-width:900px;padding:0 12px}
+  .prog-label{font-size:11px;letter-spacing:.25em;color:var(--mute);margin-bottom:6px}
+  .prog-name{font-size:clamp(26px,5.5vw,52px);font-weight:700;line-height:1.15;color:var(--text);
+    border-bottom:3px solid var(--amber);display:inline-block;padding:0 8px 6px}
+  .prog-sub{margin-top:8px;font-size:13px;color:var(--mute);display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .prog-sub #progKik{color:var(--amber)}
+  .prog.flash .prog-name{animation:progIn .5s ease-out}
+  @keyframes progIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .fsbtn{background:transparent;padding:6px 10px;font-size:12px}
 </style>
 </head>
@@ -177,6 +186,11 @@
   <!-- タイマー画面 -->
   <section id="timerView" class="hidden">
     <div class="role" id="roleLabel"></div>
+    <div class="prog hidden" id="prog">
+      <div class="prog-label"><span id="progNo"></span></div>
+      <div class="prog-name" id="progName"></div>
+      <div class="prog-sub"><span id="progKik"></span><span id="progNext"></span></div>
+    </div>
     <div class="clock" id="clock">00<span class="sep">:</span>00<span class="sep">:</span>00<span class="frac">.0</span></div>
     <div class="state" id="stateLabel">STOP</div>
 
@@ -196,9 +210,9 @@
     <div class="banner hidden" id="showBanner"></div>
     <div class="cues" id="cues">
       <div class="scenebar hidden" id="sceneBar">
-        <button id="btnPrevScene" class="opOnly" title="前のシーン">◀</button>
-        <div class="scene"><span class="no" id="sceneNo"></span><b id="sceneName"></b><small id="sceneKik"></small><span class="nx" id="sceneNext"></span></div>
-        <button id="btnNextScene" class="opOnly" title="次のシーン">▶</button>
+        <button id="btnPrevScene" class="opOnly" title="前のプログラム">◀ 前のプログラム</button>
+        <div class="scene hidden"><span class="no" id="sceneNo"></span><b id="sceneName"></b><small id="sceneKik"></small><span class="nx" id="sceneNext"></span></div>
+        <button id="btnNextScene" class="opOnly" title="次のプログラム">次のプログラム ▶</button>
       </div>
       <div class="cuehead" id="cueHead"><span>CUE SHEET</span><b id="cueRole"></b></div>
       <div id="cueList"></div>
@@ -315,7 +329,7 @@ const FIREBASE_CONFIG = {
     let html = "";
     const scenes = SHOWS[S.show] || [];
     if (!scenes.length) html = `<div class="cue empty">この演目の照明指示はまだ登録されていません</div>`;
-    else if (!list.length) html = `<div class="cue empty">このシーンでの指示はありません</div>`;
+    else if (!list.length) html = `<div class="cue empty">このプログラムでの指示はありません</div>`;
     else {
       if (now) html += cueRow(now, "now", "");
       if (next) {
@@ -323,7 +337,7 @@ const FIREBASE_CONFIG = {
         html += cueRow(next, "next", cls, `<span class="cd">${rTxt}<small>秒後</small></span>`);
       } else {
         const nx = scenes[scene+1];
-        html += `<div class="cue empty">このシーンの指示は終了${nx ? " → 次: " + esc(nx.name) : ""}</div>`;
+        html += `<div class="cue empty">このプログラムの指示は終了${nx ? " → 次: " + esc(nx.name) : ""}</div>`;
       }
       if (then) html += cueRow(then, "later", "");
     }
@@ -338,7 +352,7 @@ const FIREBASE_CONFIG = {
   function renderScene(scene){
     const scenes = SHOWS[S.show] || [];
     const other = S.role === "その他";
-    $("sceneBar").classList.toggle("hidden", !scenes.length || (other && !S.isOperator));
+    $("sceneBar").classList.toggle("hidden", !scenes.length || !S.isOperator);
     $("cueHead").classList.toggle("hidden", other);
     $("cueList").classList.toggle("hidden", other);
     $("cues").classList.toggle("hidden", other && !S.isOperator);
@@ -352,9 +366,18 @@ const FIREBASE_CONFIG = {
       $("btnMatch").onclick = () => setShow(S.vShow);
     }
     bn.classList.toggle("hidden", !mis);
+    $("prog").classList.toggle("hidden", !scenes.length);
     const key = `${S.show}|${scene}`;
     if (key === lastSceneKey || !scenes.length) return;
     lastSceneKey = key;
+    {
+      const sc0 = scenes[scene] || {}, nx0 = scenes[scene+1];
+      $("progNo").textContent = `PROGRAM ${scene+1} / ${scenes.length}`;
+      $("progName").textContent = sc0.name || "";
+      $("progKik").textContent = sc0.kik ? "きっかけ: " + sc0.kik : "";
+      $("progNext").textContent = nx0 ? "次 → " + nx0.name : "最後のプログラム";
+      const pg = $("prog"); pg.classList.remove("flash"); void pg.offsetWidth; pg.classList.add("flash");
+    }
     const sc = scenes[scene] || {}, nx = scenes[scene+1];
     $("sceneNo").textContent = `SCENE ${scene+1}/${scenes.length}`;
     $("sceneName").textContent = sc.name || "";
