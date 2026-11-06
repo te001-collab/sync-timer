@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Sync Timer — 遠隔同期ストップウォッチ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0b0c0e; --panel:#15171b; --line:#262a31; --text:#e9ecf1; --mute:#8a919c;
@@ -14,7 +14,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
-    font-family:"Noto Sans JP",system-ui,sans-serif}
+    font-family:"Inter","Noto Sans JP",system-ui,sans-serif;font-feature-settings:"tnum" 1}
   body{display:flex;flex-direction:column;min-height:100%}
   header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;
     padding:10px 16px;border-bottom:1px solid var(--line)}
@@ -32,10 +32,10 @@
   .card p{margin:0 0 16px;color:var(--mute);font-size:14px;line-height:1.6}
   .row{display:flex;gap:8px}
   input{flex:1;background:#0f1114;border:1px solid var(--line);color:var(--text);border-radius:10px;
-    padding:12px 14px;font:600 18px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:lowercase}
+    padding:12px 14px;font:600 18px "Inter","Noto Sans JP",sans-serif;letter-spacing:.12em;text-transform:lowercase}
   input:focus{outline:2px solid var(--blue);outline-offset:1px}
   button{cursor:pointer;border:1px solid var(--line);background:#1d2026;color:var(--text);
-    border-radius:10px;padding:12px 18px;font:700 15px "Noto Sans JP",sans-serif}
+    border-radius:10px;padding:12px 18px;font:500 15px "Inter","Noto Sans JP",sans-serif}
   button:hover{filter:brightness(1.15)}
   button:disabled{opacity:.4;cursor:default;filter:none}
   button.primary{background:var(--blue);border-color:var(--blue);color:#06101c}
@@ -46,13 +46,14 @@
   #timerView{width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}
   .role{font-size:12px;letter-spacing:.2em;color:var(--mute)}
   .role b{color:var(--amber)}
-  .clock{font-family:"JetBrains Mono",monospace;font-weight:700;line-height:1;
-    font-size:clamp(56px,16vw,220px);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+  .clock{font-family:"Inter","Noto Sans JP",sans-serif;font-weight:500;line-height:1;
+    font-size:clamp(56px,16vw,220px);font-variant-numeric:tabular-nums;letter-spacing:-.01em;
     color:var(--text);transition:color .2s}
+  .clock .sep{display:inline-block;margin:0 .12em;transform:translateY(-.06em)}
   .clock .frac{font-size:.55em;color:var(--mute)}
   .clock.running{color:var(--green)}
   .clock.paused{color:var(--amber)}
-  .state{font:700 14px "JetBrains Mono",monospace;letter-spacing:.25em;color:var(--mute)}
+  .state{font:700 14px "Inter","Noto Sans JP",sans-serif;letter-spacing:.25em;color:var(--mute)}
   .controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
   .controls button{min-width:130px;padding:16px 22px;font-size:17px}
   #btnStart{background:var(--green);border-color:var(--green);color:#04130a}
@@ -60,7 +61,7 @@
   #btnReset{background:transparent}
   .share{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;
     background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:14px}
-  .code{font:700 22px "JetBrains Mono",monospace;letter-spacing:.18em;color:var(--amber)}
+  .code{font:700 22px "Inter","Noto Sans JP",sans-serif;letter-spacing:.18em;color:var(--amber)}
   .share button{padding:8px 12px;font-size:13px}
   .note{color:var(--mute);font-size:12px;text-align:center;max-width:560px;line-height:1.6}
   .banner{background:#2a1d08;border:1px solid #5a3d0a;color:#ffd58a;border-radius:10px;padding:10px 14px;font-size:13px;max-width:560px;text-align:center}
@@ -77,7 +78,7 @@
   .roles button:last-child{grid-column:span 2}
   .chip{display:inline-flex;align-items:center;gap:6px;background:#1d2026;border:1px solid var(--line);
     border-radius:999px;padding:4px 10px;font-size:12px;color:var(--text);cursor:pointer}
-  .chip b{color:var(--amber);font-family:"JetBrains Mono",monospace;letter-spacing:.12em}
+  .chip b{color:var(--amber);font-family:"Inter","Noto Sans JP",sans-serif;letter-spacing:.12em}
   .groupbar{display:flex;gap:6px;align-items:center}
   .cues{width:100%;max-width:820px;display:flex;flex-direction:column;gap:6px}
   .cuehead{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.2em;color:var(--mute)}
@@ -87,8 +88,8 @@
   @keyframes slideUp{from{transform:translateY(34px);opacity:.2}to{transform:none;opacity:1}}
   .cue{display:flex;align-items:center;gap:10px;min-width:0;
     background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px}
-  .cue .tag{flex:none;width:58px;font:700 10px "JetBrains Mono",monospace;letter-spacing:.12em;color:var(--mute)}
-  .cue .t{flex:none;font:600 12px "JetBrains Mono",monospace;color:var(--mute)}
+  .cue .tag{flex:none;width:58px;font:700 10px "Inter","Noto Sans JP",sans-serif;letter-spacing:.12em;color:var(--mute)}
+  .cue .t{flex:none;font:600 12px "Inter","Noto Sans JP",sans-serif;color:var(--mute)}
   .cue .txt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cue .txt small{color:var(--mute);font-size:11px;margin-left:8px}
   .cue.now,.cue.later{opacity:.55}
@@ -98,7 +99,7 @@
   .cue.next .t{color:var(--text)}
   .cue.next .txt{font-size:clamp(15px,3vw,20px);font-weight:700;white-space:normal}
   .cue.next .txt small{display:block;margin:1px 0 0;font-weight:400}
-  .cd{flex:none;font:700 clamp(22px,4.5vw,32px) "JetBrains Mono",monospace;color:var(--blue);white-space:nowrap}
+  .cd{flex:none;font:700 clamp(22px,4.5vw,32px) "Inter","Noto Sans JP",sans-serif;color:var(--blue);white-space:nowrap}
   .cd small{font-size:.42em;color:var(--mute);margin-left:3px}
   .cue.next.soon{border-color:var(--amber);background:#241a07}
   .cue.next.soon .cd,.cue.next.soon .tag{color:var(--amber)}
@@ -112,7 +113,7 @@
   .scenebar button{flex:none;padding:6px 12px;font-size:16px;border-radius:8px}
   .scene{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;
     display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-  .scene .no{font:700 10px "JetBrains Mono",monospace;letter-spacing:.15em;color:var(--mute)}
+  .scene .no{font:700 10px "Inter","Noto Sans JP",sans-serif;letter-spacing:.15em;color:var(--mute)}
   .scene b{font-size:15px}
   .scene small{color:var(--amber);font-size:12px}
   .scene .nx{color:var(--mute);font-size:11px;margin-left:auto}
@@ -176,7 +177,7 @@
   <!-- タイマー画面 -->
   <section id="timerView" class="hidden">
     <div class="role" id="roleLabel"></div>
-    <div class="clock" id="clock">00:00:00<span class="frac">.0</span></div>
+    <div class="clock" id="clock">00<span class="sep">:</span>00<span class="sep">:</span>00<span class="frac">.0</span></div>
     <div class="state" id="stateLabel">STOP</div>
 
     <div class="controls hidden" id="controls">
@@ -332,7 +333,8 @@ const FIREBASE_CONFIG = {
     ms = Math.max(0, ms);
     const t = Math.floor(ms/100) % 10;
     const s = Math.floor(ms/1000);
-    return `${pad(Math.floor(s/3600))}:${pad(Math.floor(s/60)%60)}:${pad(s%60)}<span class="frac">.${t}</span>`;
+    const c = '<span class="sep">:</span>';
+    return `${pad(Math.floor(s/3600))}${c}${pad(Math.floor(s/60)%60)}${c}${pad(s%60)}<span class="frac">.${t}</span>`;
   }
   function opElapsed(){ return S.accum + (S.running ? performance.now() - S.startAt : 0); }
   const serverNow = () => Date.now() + (S.skew || 0);
